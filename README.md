@@ -5,7 +5,7 @@
 * This is a boosting based transfer learning algorithm for regression tasks (TwoStageTrAdaBoostR2) that is proposed by Pardoe et al. in paper "Boosting for Regression Transfer (ICML 2010)". 
 * The program `TwoStageTrAdaBoostR2` contains two main classes that are written in `scikit-learn` style and the structure is as follows: <br />
 >Stage2_TrAdaBoostR2 <br />
->>| `__init__`<br />
+>>|`__init__`<br />
 >>|`fit` <br />
 >>|`_stage2_adaboostR2`<br />
 >>|`predict` <br />
