@@ -1,7 +1,7 @@
 """
 TwoStageTrAdaBoostR2 algorithm
 
-based on algorithm 3 in paper "Boosting for Regression Transfer". 
+based on algorithm 3 in paper "Boosting for Regression Transfer".
 
 """
 
@@ -11,13 +11,16 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import KFold
 
+################################################################################
+## the second stage
+################################################################################
 class Stage2_TrAdaBoostR2:
-    def __init__(self, 
-                 base_estimator = DecisionTreeRegressor(max_depth=4), 
-                 sample_size = None,  
-                 n_estimators = 50, 
+    def __init__(self,
+                 base_estimator = DecisionTreeRegressor(max_depth=4),
+                 sample_size = None,
+                 n_estimators = 50,
                  learning_rate = 1.,
-                 loss = 'linear', 
+                 loss = 'linear',
                  random_state = np.random.mtrand._rand):
         self.base_estimator = base_estimator
         self.sample_size = sample_size
@@ -27,7 +30,7 @@ class Stage2_TrAdaBoostR2:
         self.random_state = random_state
 
 
-    def fit(self, X, y, sample_weight=None): 
+    def fit(self, X, y, sample_weight=None):
         # Check parameters
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be greater than zero")
@@ -45,17 +48,17 @@ class Stage2_TrAdaBoostR2:
                 raise ValueError(
                       "Attempting to fit with a non-positive "
                       "weighted number of samples.")
-        
+
         if self.sample_size is None:
             raise ValueError("Additional input required: sample size of source and target is missing")
         elif np.array(self.sample_size).sum() != X.shape[0]:
             raise ValueError("Input error: the specified sample size does not equal to the input size")
-            
+
         # Clear any previous fit results
         self.estimators_ = []
         self.estimator_weights_ = np.zeros(self.n_estimators, dtype=np.float64)
         self.estimator_errors_ = np.ones(self.n_estimators, dtype=np.float64)
-    
+
         for iboost in range(self.n_estimators): # this for loop is sequential and does not support parallel(revison is needed if making parallel)
             # Boosting step
             sample_weight, estimator_weight, estimator_error = self._stage2_adaboostR2(
@@ -83,12 +86,12 @@ class Stage2_TrAdaBoostR2:
                 # Normalize
                 sample_weight /= sample_weight_sum
         return self
-    
-    
+
+
     def _stage2_adaboostR2(self, iboost, X, y, sample_weight):
-        
+
         estimator = copy.deepcopy(self.base_estimator) # some estimators allow for specifying random_state estimator = base_estimator(random_state=random_state)
-    
+
         ## using sampling method to account for sample_weight as discussed in Drucker's paper
         # Weighted sampling of the training set with replacement
         cdf = np.cumsum(sample_weight)
@@ -102,7 +105,7 @@ class Stage2_TrAdaBoostR2:
         # for all samples in the training set
         estimator.fit(X[bootstrap_idx], y[bootstrap_idx])
         y_predict = estimator.predict(X)
-        
+
         self.estimators_.append(estimator)  # add the fitted estimator
 
         error_vect = np.abs(y_predict - y)
@@ -130,17 +133,17 @@ class Stage2_TrAdaBoostR2:
             return None, None, None
 
         beta = estimator_error / (1. - estimator_error)
-        
+
         # avoid overflow of np.log(1. / beta)
         if beta < 1e-308:
             beta = 1e-308
         estimator_weight = self.learning_rate * np.log(1. / beta)
-        
+
         # Boost weight using AdaBoost.R2 alg except the weight of the source data
         # the weight of the source data are remained
         source_weight_sum= np.sum(sample_weight[:-self.sample_size[-1]]) / np.sum(sample_weight)
         target_weight_sum = np.sum(sample_weight[-self.sample_size[-1]:]) / np.sum(sample_weight)
-        
+
         if not iboost == self.n_estimators - 1:
             sample_weight[-self.sample_size[-1]:] *= np.power(
                     beta,
@@ -153,9 +156,8 @@ class Stage2_TrAdaBoostR2:
                 sample_weight[-self.sample_size[-1]:] = sample_weight[-self.sample_size[-1]:]*target_weight_sum/target_weight_sum_new
 
         return sample_weight, estimator_weight, estimator_error
-    
-    
-    
+
+
     def predict(self, X):
         # Evaluate predictions of all estimators
         predictions = np.array([
@@ -173,18 +175,20 @@ class Stage2_TrAdaBoostR2:
 
         # Return median predictions
         return predictions[np.arange(X.shape[0]), median_estimators]
-    
-    
 
+
+################################################################################
+## the whole two stages
+################################################################################
 class TwoStageTrAdaBoostR2:
-    def __init__(self, 
-                 base_estimator = DecisionTreeRegressor(max_depth=4), 
-                 sample_size = None,  
-                 n_estimators = 50, 
-                 steps = 10, 
-                 fold = 5, 
+    def __init__(self,
+                 base_estimator = DecisionTreeRegressor(max_depth=4),
+                 sample_size = None,
+                 n_estimators = 50,
+                 steps = 10,
+                 fold = 5,
                  learning_rate = 1.,
-                 loss = 'linear', 
+                 loss = 'linear',
                  random_state = np.random.mtrand._rand):
         self.base_estimator = base_estimator
         self.sample_size = sample_size
@@ -196,7 +200,7 @@ class TwoStageTrAdaBoostR2:
         self.random_state = random_state
 
 
-    def fit(self, X, y, sample_weight=None): 
+    def fit(self, X, y, sample_weight=None):
         # Check parameters
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be greater than zero")
@@ -214,25 +218,25 @@ class TwoStageTrAdaBoostR2:
                 raise ValueError(
                       "Attempting to fit with a non-positive "
                       "weighted number of samples.")
-        
+
         if self.sample_size is None:
             raise ValueError("Additional input required: sample size of source and target is missing")
         elif np.array(self.sample_size).sum() != X.shape[0]:
             raise ValueError("Input error: the specified sample size does not equal to the input size")
-            
-        
+
+
         X_source = X[:-self.sample_size[-1]]
         y_source = y[:-self.sample_size[-1]]
         X_target = X[-self.sample_size[-1]:]
         y_target = y[-self.sample_size[-1]:]
-        
+
         self.models_ = []
         self.errors_ = []
         for istep in range(self.steps):
             model = Stage2_TrAdaBoostR2(self.base_estimator,
-                                        sample_size = self.sample_size, 
+                                        sample_size = self.sample_size,
                                         n_estimators = self.n_estimators,
-                                        learning_rate = self.learning_rate, loss = self.loss, 
+                                        learning_rate = self.learning_rate, loss = self.loss,
                                         random_state = self.random_state)
             model.fit(X, y, sample_weight = sample_weight)
             self.models_.append(model)
@@ -244,9 +248,9 @@ class TwoStageTrAdaBoostR2:
             for train, test in kf.split(X_target):
                 sample_size = [self.sample_size[0], len(train)]
                 model = Stage2_TrAdaBoostR2(self.base_estimator,
-                                        sample_size = sample_size, 
+                                        sample_size = sample_size,
                                         n_estimators = self.n_estimators,
-                                        learning_rate = self.learning_rate, loss = self.loss, 
+                                        learning_rate = self.learning_rate, loss = self.loss,
                                         random_state = self.random_state)
                 X_train = np.concatenate((X_source, X_target[train]))
                 y_train = np.concatenate((y_source, y_source[train]))
@@ -257,18 +261,18 @@ class TwoStageTrAdaBoostR2:
                 model.fit(X_train, y_train, sample_weight = np.concatenate((source_weight, target_weight_train)))
                 y_predict = model.predict(X_test)
                 error.append(mean_squared_error(y_predict, y_test))
-            
+
             self.errors_.append(np.array(error).mean())
 
             sample_weight = self._twostage_adaboostR2(istep, X, y, sample_weight)
-            
+
             if sample_weight is None:
                 break
             if np.array(error).mean() == 0:
                 break
-            
+
             sample_weight_sum = np.sum(sample_weight)
-            
+
             # Stop if the sum of sample weights has become non-positive
             if sample_weight_sum <= 0:
                 break
@@ -277,12 +281,12 @@ class TwoStageTrAdaBoostR2:
                 # Normalize
                 sample_weight /= sample_weight_sum
         return self
-            
-    
+
+
     def _twostage_adaboostR2(self, istep, X, y, sample_weight):
-        
+
         estimator = copy.deepcopy(self.base_estimator) # some estimators allow for specifying random_state estimator = base_estimator(random_state=random_state)
-    
+
         ## using sampling method to account for sample_weight as discussed in Drucker's paper
         # Weighted sampling of the training set with replacement
         cdf = np.cumsum(sample_weight)
@@ -296,7 +300,7 @@ class TwoStageTrAdaBoostR2:
         # for all samples in the training set
         estimator.fit(X[bootstrap_idx], y[bootstrap_idx])
         y_predict = estimator.predict(X)
-        
+
 
         error_vect = np.abs(y_predict - y)
         error_max = error_vect.max()
@@ -317,8 +321,8 @@ class TwoStageTrAdaBoostR2:
                     beta,
                     (error_vect[:-self.sample_size[-1]]) * self.learning_rate)
         return sample_weight
-    
-    
+
+
     def _beta_binary_search(self, istep, sample_weight, error_vect, stp):
         # calculate the specified sum of weight for the target data
         n_target = self.sample_size[-1]
@@ -338,7 +342,7 @@ class TwoStageTrAdaBoostR2:
                     (error_vect[:-n_target]) * self.learning_rate)
         sample_weight_ /= np.sum(sample_weight_, dtype=np.float64)
         updated_weight_sum = np.sum(sample_weight_[-n_target:], dtype=np.float64)
-        
+
         while np.abs(updated_weight_sum - theoretical_sum) > 0.01:
             if updated_weight_sum < theoretical_sum:
                 R = beta - stp
@@ -355,7 +359,7 @@ class TwoStageTrAdaBoostR2:
                     print("Binary search's goal not meeted! Value is set to be the available best!")
                     print("Try reducing the search interval. Current stp interval:", stp)
                     break
-                
+
             elif updated_weight_sum > theoretical_sum:
                 L = beta + stp
                 if L < R:
@@ -372,12 +376,10 @@ class TwoStageTrAdaBoostR2:
                     print("Try reducing the search interval. Current stp interval:", stp)
                     break
         return beta
-        
-        
-    
+
+
     def predict(self, X):
         # select the model with the least CV error
         fmodel = self.models_[np.array(self.errors_).argmin()]
         predictions = fmodel.predict(X)
-        return predictions 
-    
+        return predictions
