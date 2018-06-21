@@ -253,7 +253,7 @@ class TwoStageTrAdaBoostR2:
                                         learning_rate = self.learning_rate, loss = self.loss,
                                         random_state = self.random_state)
                 X_train = np.concatenate((X_source, X_target[train]))
-                y_train = np.concatenate((y_source, y_source[train]))
+                y_train = np.concatenate((y_source, y_target[train]))
                 X_test = X_target[test]
                 y_test = y_target[test]
                 # make sure the sum weight of the target data do not change with CV's split sampling
